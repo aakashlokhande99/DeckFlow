@@ -68,40 +68,7 @@ Building a production-grade AI workflow that produces auditable executive delive
 
 ### System Overview
 
-```text
-+--------------------------------------------------------------------------------------------------+
-|                                    NEXT.JS 14 FRONTEND                                           |
-|  - Intake Brief Form (/projects/new)             - Storyline Studio (/projects/[id]/storyline)   |
-|  - Live WebSocket Tracker (/projects/[id])       - Multi-Format Export Modal (.pptx/.pdf/.html)  |
-|  - Human Review Gate (/projects/[id]/review)     - Webhook Settings (/settings/webhooks)         |
-+--------------------------------------------------------------------------------------------------+
-                                                 │
-                                    HTTP REST + WebSockets
-                                                 ▼
-+--------------------------------------------------------------------------------------------------+
-|                                    FASTAPI BACKEND                                               |
-|  +--------------------+   +-----------------------+   +--------------------+   +---------------+ |
-|  | Projects & Review  |   |   WebSocket Stream    |   | Webhook Management |   | Export Engine | |
-|  | /api/projects      |   | /api/ws/projects/{id} |   | /api/webhooks      |   | /artifact     | |
-|  +--------------------+   +-----------------------+   +--------------------+   +---------------+ |
-+--------------------------------------------------------------------------------------------------+
-          │                                  │                                   │
-          │ SQLAlchemy (Async)               │ Redis Pub/Sub + Celery            │ Presentation
-          ▼                                  ▼                                   ▼
-+--------------------+              +--------------------+              +--------------------+
-|    POSTGRESQL      |              |   CELERY + REDIS   |              |   EXPORT ENGINE    |
-| - projects         |              |  LangGraph 8-Node  |              | - python-pptx 16:9 |
-| - sources          |              |  State Machine:    |              | - ReportLab PDF    |
-| - evidence_claims  |              |  1. validate_brief |              | - Standalone HTML  |
-| - insights         |              |  2. plan_research  |              | - 5 Brand Themes   |
-| - feedback         |              |  3. search_sources |              | - 10 Slide Layouts |
-| - slide_specs      |              |  4. fetch_extract  |              +--------------------+
-| - artifacts        |              |  5. build_evidence |
-| - webhook_subs     |              |  6. synthesize     |
-| - webhook_deliveries              |  7. quality_gate   |
-+--------------------+              |  8. human_review   |◄── [INTERRUPT GATE] ──► Slack / Teams
-                                    +--------------------+
-```
+![System Architecture](docs/architecture.jpg)
 
 ### LangGraph Workflow State Machine (`backend/app/workflow/graph.py`)
 1. `validate_brief` → Validates brief inputs (routes to `END` on validation errors).
