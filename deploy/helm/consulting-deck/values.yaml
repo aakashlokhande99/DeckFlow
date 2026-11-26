@@ -1,0 +1,213 @@
+# Default values for consulting-deck.
+# This is a YAML-formatted file.
+
+# Component-scoped configurations (compatible with enterprise Helm conventions & E2E assertions)
+backend:
+  replicaCount: 3
+  image:
+    repository: consulting-backend
+    tag: "latest"
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 8000
+  resources:
+    requests:
+      cpu: "250m"
+      memory: "512Mi"
+    limits:
+      cpu: "1000m"
+      memory: "1536Mi"
+  probes:
+    liveness:
+      path: /api/health
+      port: 8000
+    readiness:
+      path: /api/health
+      port: 8000
+
+worker:
+  replicaCount: 4
+  image:
+    repository: consulting-backend
+    tag: "latest"
+    pullPolicy: IfNotPresent
+  resources:
+    requests:
+      cpu: "500m"
+      memory: "1024Mi"
+    limits:
+      cpu: "2000m"
+      memory: "3072Mi"
+
+frontend:
+  replicaCount: 2
+  image:
+    repository: consulting-frontend
+    tag: "latest"
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 3000
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "256Mi"
+    limits:
+      cpu: "500m"
+      memory: "1024Mi"
+  probes:
+    liveness:
+      path: /
+      port: 3000
+    readiness:
+      path: /
+      port: 3000
+
+# Top-level configurations (compatible with standard chart templates)
+replicaCount:
+  backend: 3
+  worker: 4
+  frontend: 2
+
+image:
+  backend:
+    repository: consulting-backend
+    pullPolicy: IfNotPresent
+    tag: "latest"
+  frontend:
+    repository: consulting-frontend
+    pullPolicy: IfNotPresent
+    tag: "latest"
+  postgres:
+    repository: postgres
+    pullPolicy: IfNotPresent
+    tag: "16-alpine"
+  redis:
+    repository: redis
+    pullPolicy: IfNotPresent
+    tag: "7-alpine"
+
+service:
+  backend:
+    type: ClusterIP
+    port: 8000
+  frontend:
+    type: ClusterIP
+    port: 3000
+  postgres:
+    type: ClusterIP
+    port: 5432
+  redis:
+    type: ClusterIP
+    port: 6379
+
+ingress:
+  enabled: true
+  className: "nginx"
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+    nginx.ingress.kubernetes.io/websocket-services: "consulting-backend-svc"
+  hosts:
+    - host: consulting.enterprise.internal
+      paths:
+        - path: /api/ws
+          pathType: Prefix
+          service: backend
+        - path: /api
+          pathType: Prefix
+          service: backend
+        - path: /
+          pathType: Prefix
+          service: frontend
+  tls: []
+
+resources:
+  backend:
+    requests:
+      cpu: "250m"
+      memory: "512Mi"
+    limits:
+      cpu: "1000m"
+      memory: "1536Mi"
+  worker:
+    requests:
+      cpu: "500m"
+      memory: "1024Mi"
+    limits:
+      cpu: "2000m"
+      memory: "3072Mi"
+  frontend:
+    requests:
+      cpu: "100m"
+      memory: "256Mi"
+    limits:
+      cpu: "500m"
+      memory: "1024Mi"
+  postgres:
+    requests:
+      cpu: "250m"
+      memory: "512Mi"
+    limits:
+      cpu: "1000m"
+      memory: "1536Mi"
+  redis:
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+    limits:
+      cpu: "500m"
+      memory: "512Mi"
+
+autoscaling:
+  backend:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 75
+    targetMemoryUtilizationPercentage: 80
+  worker:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 8
+    targetCPUUtilizationPercentage: 80
+    targetMemoryUtilizationPercentage: 85
+
+persistence:
+  storageClass: "standard"
+  artifacts:
+    enabled: true
+    size: 10Gi
+    accessModes:
+      - ReadWriteMany
+    storageClass: ""
+  postgres:
+    enabled: true
+    size: 20Gi
+    accessModes:
+      - ReadWriteOnce
+    storageClass: ""
+
+postgres:
+  enabled: true
+  database: "consulting_prod"
+  user: "consulting_admin"
+  password: "ChangeMeInProductionSecret2026!"
+
+redis:
+  enabled: true
+  password: "RedisSecretProd2026!"
+
+env:
+  ENVIRONMENT: "production"
+  LOG_LEVEL: "INFO"
+  LLM_PROVIDER: "openai"
+  SEARCH_PROVIDER: "serpapi"
+
+secrets:
+  SECRET_KEY: "ProdEnterpriseSecretSigningKey2026Secure!"
+  OPENAI_API_KEY: ""
+  SERPAPI_API_KEY: ""
+  SERPAPI_KEY: ""

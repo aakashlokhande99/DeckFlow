@@ -1,0 +1,54 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "consulting-deck.fullname" . }}-backend
+  labels:
+    {{- include "consulting-deck.labels" . | nindent 4 }}
+    app.kubernetes.io/component: backend
+spec:
+  replicas: {{ .Values.replicaCount.backend }}
+  selector:
+    matchLabels:
+      {{- include "consulting-deck.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: backend
+  template:
+    metadata:
+      labels:
+        {{- include "consulting-deck.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: backend
+    spec:
+      containers:
+        - name: backend
+          image: "{{ .Values.image.backend.repository }}:{{ .Values.image.backend.tag }}"
+          imagePullPolicy: {{ .Values.image.backend.pullPolicy }}
+          ports:
+            - containerPort: {{ .Values.service.backend.port }}
+              name: http
+          envFrom:
+            - configMapRef:
+                name: {{ include "consulting-deck.fullname" . }}-config
+            - secretRef:
+                name: {{ include "consulting-deck.fullname" . }}-secrets
+          volumeMounts:
+            - name: artifacts-volume
+              mountPath: /app/artifacts
+          resources:
+            {{- toYaml .Values.resources.backend | nindent 12 }}
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: {{ .Values.service.backend.port }}
+            initialDelaySeconds: 15
+            periodSeconds: 20
+            timeoutSeconds: 5
+          readinessProbe:
+            httpGet:
+              path: /api/health/db
+              port: {{ .Values.service.backend.port }}
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+      volumes:
+        - name: artifacts-volume
+          persistentVolumeClaim:
+            claimName: {{ include "consulting-deck.fullname" . }}-artifacts-pvc

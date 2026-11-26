@@ -1,0 +1,16 @@
+apiVersion: v2
+name: consulting-deck
+description: A Helm chart for Enterprise AI Consulting Deck Generator
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+keywords:
+  - consulting-deck
+  - ai
+  - langchain
+  - fastapi
+  - nextjs
+home: https://github.com/enterprise/consulting-deck
+maintainers:
+  - name: enterprise-platform-team
+    email: platform@enterprise.internal

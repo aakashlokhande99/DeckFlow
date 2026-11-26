@@ -1,0 +1,31 @@
+{{- if .Values.persistence.artifacts.enabled }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "consulting-deck.fullname" . }}-artifacts-pvc
+  labels:
+    {{- include "consulting-deck.labels" . | nindent 4 }}
+spec:
+  accessModes:
+    {{- toYaml .Values.persistence.artifacts.accessModes | nindent 4 }}
+  storageClassName: {{ .Values.persistence.artifacts.storageClass | default .Values.persistence.storageClass | default "standard" | quote }}
+  resources:
+    requests:
+      storage: {{ .Values.persistence.artifacts.size }}
+{{- end }}
+{{- if and .Values.postgres.enabled .Values.persistence.postgres.enabled }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "consulting-deck.fullname" . }}-postgres-pvc
+  labels:
+    {{- include "consulting-deck.labels" . | nindent 4 }}
+spec:
+  accessModes:
+    {{- toYaml .Values.persistence.postgres.accessModes | nindent 4 }}
+  storageClassName: {{ .Values.persistence.postgres.storageClass | default .Values.persistence.storageClass | default "standard" | quote }}
+  resources:
+    requests:
+      storage: {{ .Values.persistence.postgres.size }}
+{{- end }}

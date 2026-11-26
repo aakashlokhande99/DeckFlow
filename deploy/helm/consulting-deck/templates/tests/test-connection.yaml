@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: "{{ include "consulting-deck.fullname" . }}-test-connection"
+  labels:
+    {{- include "consulting-deck.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": test
+spec:
+  containers:
+    - name: wget
+      image: busybox:latest
+      command: ['wget']
+      args: ['{{ include "consulting-deck.fullname" . }}-backend-svc:{{ .Values.service.backend.port }}/api/health']
+  restartPolicy: Never

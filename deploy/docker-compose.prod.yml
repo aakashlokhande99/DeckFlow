@@ -1,0 +1,188 @@
+# =============================================================================
+# Track D: Production Multi-Container Orchestration (Docker Compose Blueprint)
+# =============================================================================
+# Architecture:
+#   - db: PostgreSQL 16 with Persistent Volume & Health Check
+#   - redis: Redis 7 Broker for Celery tasks & Pub/Sub WebSocket event bus
+#   - backend: FastAPI API service with Uvicorn ASGI workers & WebSocket support
+#   - worker: Celery distributed worker pool executing multi-agent LangGraph workflows
+#   - frontend: Production Next.js standalone container serving App Router UI
+# Shared storage:
+#   - artifacts_prod: Shared named volume for generated presentations (PPTX/PDF/HTML)
+# =============================================================================
+
+version: "3.8"
+
+services:
+  # ── PostgreSQL Database ──────────────────────────────────────────────────
+  db:
+    image: postgres:16-alpine
+    container_name: consulting_db_prod
+    restart: always
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-consulting_prod}
+      POSTGRES_USER: ${POSTGRES_USER:-consulting_admin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ChangeMeInProductionSecret2026!}
+    volumes:
+      - pgdata_prod:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-consulting_admin} -d ${POSTGRES_DB:-consulting_prod}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 1536M
+        reservations:
+          cpus: "0.25"
+          memory: 512M
+    networks:
+      - consulting_net
+
+  # ── Redis Broker & Pub/Sub Event Bus ─────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: consulting_redis_prod
+    restart: always
+    command: ["redis-server", "--appendonly", "yes", "--requirepass", "${REDIS_PASSWORD:-RedisSecretProd2026!}"]
+    volumes:
+      - redisdata_prod:/data
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-RedisSecretProd2026!}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 512M
+        reservations:
+          cpus: "0.1"
+          memory: 128M
+    networks:
+      - consulting_net
+
+  # ── FastAPI Backend API & WebSocket Server ──────────────────────────────
+  backend:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    container_name: consulting_backend_prod
+    restart: always
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      ENVIRONMENT: production
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-consulting_admin}:${POSTGRES_PASSWORD:-ChangeMeInProductionSecret2026!}@db:5432/${POSTGRES_DB:-consulting_prod}
+      REDIS_URL: redis://:${REDIS_PASSWORD:-RedisSecretProd2026!}@redis:6379/0
+      CELERY_BROKER_URL: redis://:${REDIS_PASSWORD:-RedisSecretProd2026!}@redis:6379/0
+      CELERY_RESULT_BACKEND: redis://:${REDIS_PASSWORD:-RedisSecretProd2026!}@redis:6379/0
+      SECRET_KEY: ${SECRET_KEY:-ProdEnterpriseSecretSigningKey2026Secure!}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      SERPAPI_API_KEY: ${SERPAPI_API_KEY:-}
+      SERPAPI_KEY: ${SERPAPI_KEY:-${SERPAPI_API_KEY:-}}
+    volumes:
+      - artifacts_prod:/app/artifacts
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 1536M
+        reservations:
+          cpus: "0.25"
+          memory: 512M
+    networks:
+      - consulting_net
+
+  # ── Celery Distributed Agent Worker ──────────────────────────────────────
+  worker:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    container_name: consulting_worker_prod
+    restart: always
+    command: ["celery", "-A", "app.worker.celery_app", "worker", "--loglevel=INFO", "--concurrency=4"]
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      ENVIRONMENT: production
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-consulting_admin}:${POSTGRES_PASSWORD:-ChangeMeInProductionSecret2026!}@db:5432/${POSTGRES_DB:-consulting_prod}
+      REDIS_URL: redis://:${REDIS_PASSWORD:-RedisSecretProd2026!}@redis:6379/0
+      CELERY_BROKER_URL: redis://:${REDIS_PASSWORD:-RedisSecretProd2026!}@redis:6379/0
+      CELERY_RESULT_BACKEND: redis://:${REDIS_PASSWORD:-RedisSecretProd2026!}@redis:6379/0
+      SECRET_KEY: ${SECRET_KEY:-ProdEnterpriseSecretSigningKey2026Secure!}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      SERPAPI_API_KEY: ${SERPAPI_API_KEY:-}
+      SERPAPI_KEY: ${SERPAPI_KEY:-${SERPAPI_API_KEY:-}}
+    volumes:
+      - artifacts_prod:/app/artifacts
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 3072M
+        reservations:
+          cpus: "0.5"
+          memory: 1024M
+    networks:
+      - consulting_net
+
+  # ── Next.js Frontend ─────────────────────────────────────────────────────
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+    container_name: consulting_frontend_prod
+    restart: always
+    depends_on:
+      backend:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      NEXT_PUBLIC_API_URL: http://backend:8000
+    ports:
+      - "3000:3000"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O - http://localhost:3000/ > /dev/null 2>&1 || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 1024M
+        reservations:
+          cpus: "0.1"
+          memory: 256M
+    networks:
+      - consulting_net
+
+networks:
+  consulting_net:
+    driver: bridge
+
+volumes:
+  pgdata_prod:
+  redisdata_prod:
+  artifacts_prod:

@@ -1,0 +1,79 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: consulting-redis
+  namespace: consulting-prod
+  labels:
+    app: consulting-redis
+    app.kubernetes.io/part-of: consulting-deck
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: consulting-redis
+  template:
+    metadata:
+      labels:
+        app: consulting-redis
+    spec:
+      containers:
+        - name: redis
+          image: redis:7-alpine
+          imagePullPolicy: IfNotPresent
+          command:
+            - redis-server
+            - --appendonly
+            - "yes"
+            - --requirepass
+            - $(REDIS_PASSWORD)
+          env:
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: consulting-secrets
+                  key: REDIS_PASSWORD
+          ports:
+            - containerPort: 6379
+              name: redis
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+          livenessProbe:
+            exec:
+              command:
+                - /bin/sh
+                - -c
+                - redis-cli -a $REDIS_PASSWORD ping
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            timeoutSeconds: 5
+          readinessProbe:
+            exec:
+              command:
+                - /bin/sh
+                - -c
+                - redis-cli -a $REDIS_PASSWORD ping
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: consulting-redis-svc
+  namespace: consulting-prod
+  labels:
+    app: consulting-redis
+    app.kubernetes.io/part-of: consulting-deck
+spec:
+  type: ClusterIP
+  selector:
+    app: consulting-redis
+  ports:
+    - port: 6379
+      targetPort: 6379
+      name: redis

@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: consulting-prod
+  labels:
+    name: consulting-prod
+    app.kubernetes.io/part-of: consulting-deck

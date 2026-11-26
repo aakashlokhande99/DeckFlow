@@ -1,0 +1,62 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: consulting-worker
+  namespace: consulting-prod
+  labels:
+    app: consulting-worker
+    tier: worker
+    app.kubernetes.io/part-of: consulting-deck
+spec:
+  replicas: 4
+  selector:
+    matchLabels:
+      app: consulting-worker
+  template:
+    metadata:
+      labels:
+        app: consulting-worker
+        tier: worker
+    spec:
+      containers:
+        - name: worker
+          image: consulting-backend:latest
+          imagePullPolicy: IfNotPresent
+          command: ["celery", "-A", "app.worker.celery_app", "worker", "--loglevel=INFO", "--concurrency=4"]
+          envFrom:
+            - configMapRef:
+                name: consulting-config
+            - secretRef:
+                name: consulting-secrets
+          volumeMounts:
+            - name: artifacts-volume
+              mountPath: /app/artifacts
+          resources:
+            requests:
+              cpu: "500m"
+              memory: "1024Mi"
+            limits:
+              cpu: "2000m"
+              memory: "3072Mi"
+          livenessProbe:
+            exec:
+              command:
+                - /bin/sh
+                - -c
+                - celery -A app.worker.celery_app inspect ping -d celery@$HOSTNAME --timeout=5
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            timeoutSeconds: 10
+          readinessProbe:
+            exec:
+              command:
+                - /bin/sh
+                - -c
+                - celery -A app.worker.celery_app inspect ping -d celery@$HOSTNAME --timeout=5
+            initialDelaySeconds: 15
+            periodSeconds: 15
+            timeoutSeconds: 10
+      volumes:
+        - name: artifacts-volume
+          persistentVolumeClaim:
+            claimName: consulting-artifacts-pvc
